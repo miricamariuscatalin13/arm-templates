@@ -1,0 +1,171 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "app-windows-test-vmName": {
+            "type": "string",
+            "minLength": 1
+        },
+        "app-windows-test-vmAdminUserName": {
+            "type": "string",
+            "minLength": 1
+        },
+        "app-windows-test-vmAdminPassword": {
+            "type": "securestring"
+        },
+        "app-windows-test-vmWindowsOSVersion": {
+            "type": "string",
+            "defaultValue": "2012-R2-Datacenter",
+            "allowedValues": [
+                "2008-R2-SP1",
+                "2012-Datacenter",
+                "2012-R2-Datacenter",
+                "Windows-Server-Technical-Preview"
+            ]
+        },
+        "appwindowsteststType": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_ZRS",
+                "Standard_GRS",
+                "Standard_RAGRS",
+                "Premium_LRS"
+            ]
+        }
+    },
+    "resources": [
+        {
+            "name": "[variables('app-windows-test-vmNicName')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2015-06-15",
+            "dependsOn": [
+                "[concat('Microsoft.Network/virtualNetworks/', 'app-windows-test-vnet')]"
+            ],
+            "tags": {
+                "displayName": "app-windows-test-vmNic"
+            },
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[variables('app-windows-test-vmSubnetRef')]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[parameters('app-windows-test-vmName')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2015-06-15",
+            "dependsOn": [
+                "[concat('Microsoft.Storage/storageAccounts/', variables('appwindowsteststName'))]",
+                "[concat('Microsoft.Network/networkInterfaces/', variables('app-windows-test-vmNicName'))]"
+            ],
+            "tags": {
+                "displayName": "app-windows-test-vm"
+            },
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[variables('app-windows-test-vmVmSize')]"
+                },
+                "osProfile": {
+                    "computerName": "[parameters('app-windows-test-vmName')]",
+                    "adminUsername": "[parameters('app-windows-test-vmAdminUsername')]",
+                    "adminPassword": "[parameters('app-windows-test-vmAdminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('app-windows-test-vmImagePublisher')]",
+                        "offer": "[variables('app-windows-test-vmImageOffer')]",
+                        "sku": "[parameters('app-windows-test-vmWindowsOSVersion')]",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "name": "app-windows-test-vmOSDisk",
+                        "vhd": {
+                            "uri": "[concat('http://', variables('appwindowsteststName'), '.blob.core.windows.net/', variables('app-windows-test-vmStorageAccountContainerName'), '/', variables('app-windows-test-vmOSDiskName'), '.vhd')]"
+                        },
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('app-windows-test-vmNicName'))]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "[variables('appwindowsteststName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2015-06-15",
+            "dependsOn": [],
+            "tags": {
+                "displayName": "appwindowstestst"
+            },
+            "properties": {
+                "accountType": "[parameters('appwindowsteststType')]"
+            }
+        },
+        {
+            "name": "app-windows-test-vnet",
+            "type": "Microsoft.Network/virtualNetworks",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2015-06-15",
+            "dependsOn": [],
+            "tags": {
+                "displayName": "app-windows-test-vnet"
+            },
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('app-windows-test-vnetPrefix')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('app-windows-test-vnetSubnet1Name')]",
+                        "properties": {
+                            "addressPrefix": "[variables('app-windows-test-vnetSubnet1Prefix')]"
+                        }
+                    },
+                    {
+                        "name": "[variables('app-windows-test-vnetSubnet2Name')]",
+                        "properties": {
+                            "addressPrefix": "[variables('app-windows-test-vnetSubnet2Prefix')]"
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "variables": {
+        "app-windows-test-vmImagePublisher": "MicrosoftWindowsServer",
+        "app-windows-test-vmImageOffer": "WindowsServer",
+        "app-windows-test-vmOSDiskName": "app-windows-test-vmOSDisk",
+        "app-windows-test-vmVmSize": "Standard_D1",
+        "app-windows-test-vmVnetID": "[resourceId('Microsoft.Network/virtualNetworks', 'app-windows-test-vnet')]",
+        "app-windows-test-vmSubnetRef": "[concat(variables('app-windows-test-vmVnetID'), '/subnets/', variables('app-windows-test-vnetSubnet1Name'))]",
+        "app-windows-test-vmStorageAccountContainerName": "vhds",
+        "app-windows-test-vmNicName": "[concat(parameters('app-windows-test-vmName'), 'NetworkInterface')]",
+        "appwindowsteststName": "[concat('appwindowstestst', uniqueString(resourceGroup().id))]",
+        "app-windows-test-vnetPrefix": "10.0.0.0/16",
+        "app-windows-test-vnetSubnet1Name": "Subnet-1",
+        "app-windows-test-vnetSubnet1Prefix": "10.0.0.0/24",
+        "app-windows-test-vnetSubnet2Name": "Subnet-2",
+        "app-windows-test-vnetSubnet2Prefix": "10.0.1.0/24"
+    }
+}

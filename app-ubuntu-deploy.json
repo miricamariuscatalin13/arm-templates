@@ -1,0 +1,170 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "app-ubuntu-test-vmName": {
+            "type": "string",
+            "minLength": 1
+        },
+        "app-ubuntu-test-vmAdminUserName": {
+            "type": "string",
+            "minLength": 1
+        },
+        "app-ubuntu-test-vmAdminPassword": {
+            "type": "securestring"
+        },
+        "app-ubuntu-test-vmUbuntuOSVersion": {
+            "type": "string",
+            "defaultValue": "14.04.2-LTS",
+            "allowedValues": [
+                "12.04.5-LTS",
+                "14.04.2-LTS",
+                "15.04"
+            ]
+        },
+        "appubuntutestvmType": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_ZRS",
+                "Standard_GRS",
+                "Standard_RAGRS",
+                "Premium_LRS"
+            ]
+        }
+    },
+    "resources": [
+        {
+            "name": "[variables('app-ubuntu-test-vmNicName')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2015-06-15",
+            "dependsOn": [
+                "[concat('Microsoft.Network/virtualNetworks/', 'app-ubuntu-test-vnet')]"
+            ],
+            "tags": {
+                "displayName": "app-ubuntu-test-vmNic"
+            },
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[variables('app-ubuntu-test-vmSubnetRef')]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[parameters('app-ubuntu-test-vmName')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2015-06-15",
+            "dependsOn": [
+                "[concat('Microsoft.Storage/storageAccounts/', variables('appubuntutestvmName'))]",
+                "[concat('Microsoft.Network/networkInterfaces/', variables('app-ubuntu-test-vmNicName'))]"
+            ],
+            "tags": {
+                "displayName": "app-ubuntu-test-vm"
+            },
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[variables('app-ubuntu-test-vmVmSize')]"
+                },
+                "osProfile": {
+                    "computerName": "[parameters('app-ubuntu-test-vmName')]",
+                    "adminUsername": "[parameters('app-ubuntu-test-vmAdminUsername')]",
+                    "adminPassword": "[parameters('app-ubuntu-test-vmAdminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('app-ubuntu-test-vmImagePublisher')]",
+                        "offer": "[variables('app-ubuntu-test-vmImageOffer')]",
+                        "sku": "[parameters('app-ubuntu-test-vmUbuntuOSVersion')]",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "name": "app-ubuntu-test-vmOSDisk",
+                        "vhd": {
+                            "uri": "[concat('http://', variables('appubuntutestvmName'), '.blob.core.windows.net/', variables('app-ubuntu-test-vmStorageAccountContainerName'), '/', variables('app-ubuntu-test-vmOSDiskName'), '.vhd')]"
+                        },
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('app-ubuntu-test-vmNicName'))]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "[variables('appubuntutestvmName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2015-06-15",
+            "dependsOn": [],
+            "tags": {
+                "displayName": "appubuntutestvm"
+            },
+            "properties": {
+                "accountType": "[parameters('appubuntutestvmType')]"
+            }
+        },
+        {
+            "name": "app-ubuntu-test-vnet",
+            "type": "Microsoft.Network/virtualNetworks",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2015-06-15",
+            "dependsOn": [],
+            "tags": {
+                "displayName": "app-ubuntu-test-vnet"
+            },
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('app-ubuntu-test-vnetPrefix')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('app-ubuntu-test-vnetSubnet1Name')]",
+                        "properties": {
+                            "addressPrefix": "[variables('app-ubuntu-test-vnetSubnet1Prefix')]"
+                        }
+                    },
+                    {
+                        "name": "[variables('app-ubuntu-test-vnetSubnet2Name')]",
+                        "properties": {
+                            "addressPrefix": "[variables('app-ubuntu-test-vnetSubnet2Prefix')]"
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "variables": {
+        "app-ubuntu-test-vmImagePublisher": "Canonical",
+        "app-ubuntu-test-vmImageOffer": "UbuntuServer",
+        "app-ubuntu-test-vmOSDiskName": "app-ubuntu-test-vmOSDisk",
+        "app-ubuntu-test-vmVmSize": "Standard_D1",
+        "app-ubuntu-test-vmVnetID": "[resourceId('Microsoft.Network/virtualNetworks', 'app-ubuntu-test-vnet')]",
+        "app-ubuntu-test-vmSubnetRef": "[concat(variables('app-ubuntu-test-vmVnetID'), '/subnets/', variables('app-ubuntu-test-vnetSubnet1Name'))]",
+        "app-ubuntu-test-vmStorageAccountContainerName": "vhds",
+        "app-ubuntu-test-vmNicName": "[concat(parameters('app-ubuntu-test-vmName'), 'NetworkInterface')]",
+        "appubuntutestvmName": "[concat('appubuntutestvm', uniqueString(resourceGroup().id))]",
+        "app-ubuntu-test-vnetPrefix": "10.0.0.0/16",
+        "app-ubuntu-test-vnetSubnet1Name": "Subnet-1",
+        "app-ubuntu-test-vnetSubnet1Prefix": "10.0.0.0/24",
+        "app-ubuntu-test-vnetSubnet2Name": "Subnet-2",
+        "app-ubuntu-test-vnetSubnet2Prefix": "10.0.1.0/24"
+    }
+}
